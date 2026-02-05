@@ -1,0 +1,10 @@
+#!/bin/sh
+'''exec' "/Users/kdt/Library/Mobile Documents/com~apple~CloudDocs/원상복구/7학년 2학기/빅데이터/수업/통계데이터사이언스_류근관교수님/과제/ANN 팀/모델/정원_Lending-Club-PRJ-0.2_ANN/ann_venv_new/bin/python3" "$0" "$@"
+' '''
+# -*- coding: utf-8 -*-
+import re
+import sys
+from pip._internal.cli.main import main
+if __name__ == '__main__':
+    sys.argv[0] = re.sub(r'(-script\.pyw|\.exe)?$', '', sys.argv[0])
+    sys.exit(main())

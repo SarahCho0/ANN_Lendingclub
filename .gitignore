@@ -1,0 +1,19 @@
+# .gitignore 내용
+# 데이터 파일 제외
+data/*.csv
+data/*.xlsx
+
+# 맥북 시스템 파일 제외
+.DS_Store
+
+# 파이썬/주피터 관련 제외
+__pycache__/
+*.ipynb_checkpoints/
+.env
+venv/
+data/
+ann_venv_final/
+ann_venv_final/
+lending_club_2020_train.csv
+*.csv
+.DS_Store
