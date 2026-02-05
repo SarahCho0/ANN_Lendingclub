@@ -64,9 +64,7 @@ Lending-Club-PRJ_ANN/
 ├── requirements.txt               # 패키지 목록
 ├── lending_club_2020_train.csv   # 원본 데이터
 ├── experiments_log.csv            # 실험 로그
-├── README.md                      # 이 파일
-├── SETUP_GUIDE.md                # 설정 상세 가이드
-└── REFACTORING_REPORT.md         # 리팩토링 완료 보고서
+└── README.md                      # 이 파일
 ```
 
 ---
