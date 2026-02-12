@@ -296,31 +296,6 @@ $$\text{Sharpe} = \frac{\text{평균 수익률} - \text{무위험률}}{\text{표
 └── 모델별 가중치를 동적으로 계산
 ```
 
-### 4️⃣ Requirements 단순화
-불필요한 Jupyter 관련 패키지 제거 (100개 → 20개 핵심 패키지)
-
----
-
-## 🔄 개선사항 요약
-
-### Before (다중 모델 기반)
-```
-❌ XGBoost, LightGBM, LogisticRegression 병행
-❌ 하드코딩된 경로와 파라미터
-❌ 코드 중복 많음
-❌ 모델 관리 복잡
-```
-
-### After (ANN + 중앙 설정)
-```
-✅ ANN만 사용 (단순화)
-✅ config.py에서 모든 설정 관리
-✅ 코드 재사용성 높음
-✅ 최적 임계값 θ* 부트스트래핑
-✅ 벤치마크 비교 분석
-✅ 최종 평가: 포트폴리오 IRR, 부트스트랩 분포
-```
-
 ---
 
 ## 📝 실험 로깅
@@ -339,30 +314,3 @@ Date, Model, Split, AUC, Sharpe, Avg_Return, Duration, Params, Memo
 3. **변수 선택**: `EXCLUDE_COLS` 조정하여 특성 공학 진행
 4. **Out-of-Sample 테스트**: Test 세트로 최종 성과 평가
 
----
-
-## 🔧 문제 해결
-
-### numpy-financial 설치
-```bash
-pip install numpy-financial
-```
-
-### 패키지 업그레이드
-```bash
-pip install -r requirements.txt --upgrade
-```
-
----
-
-## 📞 주요 특징 (v0.7)
-
-- ✅ **일관된 Sharpe 계산**: Validation, 최적 임계값 탐색, Test 모두 **같은 IRR 기반 Sharpe** 사용
-- ✅ **벤치마크**: 모든 대출 승인 vs ANN 선택적 투자 비교
-- ✅ **효율성**: 투자 대출만 IRR 계산 → 연산량 50% 감소
-- ✅ **신뢰성**: 부트스트랩 신뢰구간으로 결과 검증
-- ✅ **자동화**: 일관된 Sharpe 계산 및 최종 평가 완전 자동화
-
----
-
-**프로젝트 상태**: ✅ Ready to Run
