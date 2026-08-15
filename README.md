@@ -1,316 +1,204 @@
-# 🏦 Lending Club 신용평가 프로젝트 - ANN 모델 기반 투자 최적화
+<div align="center">
 
-## 📋 프로젝트 개요
+<br/>
 
-Lending Club 데이터로 **ANN(Artificial Neural Network) 모델**을 학습하여 부도 예측 및 **Sharpe Ratio 최대화 투자 임계값(θ*)** 도출
+# 💰 LendingClub Sharpe Optimizer
 
-**목표**: 부도 확률 예측 → 최적 임계값(θ*) 탐색 → Sharpe Ratio 최대화 투자 전략 수립
+**ANN default prediction · Sharpe-ratio optimal investment threshold search**
 
----
+<br/>
 
-## 🎯 프로젝트 목표
+[![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-MLPClassifier-F7931E?style=flat-square&logo=scikit-learn&logoColor=white)](https://scikit-learn.org)
+[![pandas](https://img.shields.io/badge/pandas-150458?style=flat-square&logo=pandas&logoColor=white)](https://pandas.pydata.org)
+[![Polars](https://img.shields.io/badge/Polars-CD792C?style=flat-square&logo=polars&logoColor=white)](https://pola.rs)
+[![Jupyter](https://img.shields.io/badge/Jupyter-F37626?style=flat-square&logo=jupyter&logoColor=white)](https://jupyter.org)
 
-- ✅ ANN 신경망을 사용한 대출 부도 예측
-- ✅ 최적 임계값(θ*) 자동 탐색으로 Sharpe Ratio 최대화
-- ✅ 포트폴리오 기대 수익률 및 위험도 평가
-- ✅ 벤치마크(모든 대출 승인) 대비 성과 개선도 측정
+<br/>
 
----
+[![📐 Algorithm](https://img.shields.io/badge/📐_Core-Algorithm-2E7D32?style=for-the-badge)](#core-algorithm)
+[![⚙️ Model](https://img.shields.io/badge/⚙️_Model-Config-1565C0?style=for-the-badge)](#model-configuration)
 
-## 🔄 전체 파이프라인 흐름
+<br/>
 
-```
-1️⃣ 데이터 분할 (층화추출)
-   Train(60%) / Validation(20%) / Test(20%)
-   
-2️⃣ ANN 모델 학습 (Train 데이터)
-   - 은닉층: [256, 128, 64]
-   - 활성화 함수: ReLU
-   - Dropout rate: 0.3
-   
-3️⃣ Validation 평가 + 최적 임계값(θ*) 탐색
-   → Sharpe Ratio 최대화하는 θ* 찾기
-   
-4️⃣ Test 평가 (θ* 적용)
-   → 최종 Sharpe, 포트폴리오 수익률, 신뢰구간
-   
-5️⃣ 벤치마크 비교
-   → 모든 대출 승인 시나리오 vs ANN 전략
-```
+</div>
 
 ---
 
-## 📁 프로젝트 구조
+## Overview
 
-```
-Lending-Club-PRJ_ANN/
-├── ann_venv_final/               # Python 가상환경 (최종)
-├── ann_venv_new/                 # Python 가상환경 (테스트)
-├── src/
-│   ├── config.py                 # ✨ 중앙 설정 파일
-│   ├── utils.py                  # 로거 유틸
-│   ├── preprocess_pipeline.py    # 데이터 전처리
-│   ├── train_models.py           # Random Split 학습
-│   └── train_models_random.py    # K-Fold CV 학습
-├── notebooks/                     # EDA/분석 노트북
-│   ├── 01_label_definition.ipynb
-│   ├── 02_eda_visualization.ipynb
-│   └── 03_modeling.ipynb
-├── models/                        # 저장된 모델들
-├── data/
-│   ├── external/                 # 외부 데이터 (국채 수익률 등)
-│   ├── processed/                # 전처리된 데이터
-│   └── raw/
-├── requirements.txt               # 패키지 목록
-├── lending_club_2020_train.csv   # 원본 데이터
-├── experiments_log.csv            # 실험 로그
-└── README.md                      # 이 파일
-```
+**LendingClub Sharpe Optimizer** trains a **scikit-learn `MLPClassifier` (ANN)** on Lending Club loan data to predict default probability, then searches the investment threshold **θ\*** that maximizes portfolio **Sharpe ratio** — computed from IRR-based cash flows — and validates it with a **1,000-sample bootstrap** for a 95% confidence interval, benchmarked against an approve-all-loans strategy.
+
+| | Train (60%) | Validation (20%) | Test (20%) |
+|---|---|---|---|
+| **Purpose** | Fit the ANN | Search θ\* — max Sharpe over a 990-point grid (1%–99%, 0.1% steps) | Final Sharpe + 95% CI (1,000-sample bootstrap) |
+| **Output** | `MLPClassifier` | `optimal_threshold.png` | Benchmark comparison |
 
 ---
 
-## ⚙️ 환경 설정
+## Quick Start
 
-### 가상환경 생성 (첫 설정)
+**1 · Environment**
+
 ```bash
-python3 -m venv ann_venv_new
-source ann_venv_new/bin/activate
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 이후 실행
-```bash
-source ann_venv_new/bin/activate
-python src/train_models.py
-```
+**2 · Preprocess**
 
----
-
-## 📊 핵심 알고리즘
-
-### Sharpe Ratio 계산 (IRR 기반)
-
-**공식**:
-$$\text{Sharpe} = \frac{E[R_p] - E[R_f]}{\sigma[R_p]}$$
-
-**투자 결정 로직**:
-```python
-# 부도 확률 < θ인 대출만 투자
-invest = (pred_prob < θ)
-
-# 포트폴리오 수익률 구성
-portfolio_return = {
-    IRR          if 투자 (pred_prob < θ)
-    rf_return    if 거절 (pred_prob ≥ θ)
-}
-
-# Sharpe 계산
-Sharpe = (mean(portfolio_return) - mean(rf_return)) / std(portfolio_return)
-```
-
-### IRR(내부수익률) 계산
-
-**원리금균등상환** 기반 현금흐름:
-```
-월 상환액 = P × [r(1+r)^n] / [(1+r)^n - 1]
-현금흐름 = [-P, A, A, ..., A] (부도 시 조기 종료)
-
-월별 IRR → 연율화: annual_irr = (1 + monthly_irr)^12 - 1
-```
-
-### 최적 임계값(θ*) 탐색
-
-**목표**: Sharpe Ratio 최대화하는 θ 찾기
-
-**Validation 단계 (θ* 결정)**:
-1. Validation 데이터로 990개 θ값(1%~99%, 0.1% 단위) 각각 테스트
-2. 각 θ에 대해 Sharpe Ratio 계산
-3. Sharpe 최대인 **θ* 1개 선택**
-
-**Test 단계 (신뢰구간 계산)**:
-1. 선택된 θ*를 Test 데이터에 적용
-2. 1,000회 부트스트래핑 실행 → Sharpe 분포 생성
-3. **95% 신뢰구간** 계산 (하위 2.5%, 상위 97.5% 백분위수)
-
----
-
-## 🏃 실행 방법
-
-### 1. 환경 활성화
-```bash
-source ann_venv_new/bin/activate
-```
-
-### 2. 데이터 전처리
 ```bash
 cd src
 python preprocess_pipeline.py
 ```
 
-### 3. 모델 학습 (ANN)
+**3 · Train**
+
 ```bash
 python train_models.py
 ```
 
-**생성 파일**:
-- `models/ANN_final.pkl` - 학습된 모델
-- `models/optimal_threshold.png` - θ* 시각화
-- `experiments_log.csv` - 실험 결과 기록
+> Outputs: `models/ANN_Validation.pkl`, `models/ANN_Test.pkl`, `models/optimal_threshold.png`, `experiments_log.csv`
 
 ---
 
-## 📋 모델 설정
+## Project Structure
 
-### ANN (Artificial Neural Network)
+```
+ANN_Lendingclub/
+├── src/
+│   ├── config.py                 # Central config — paths, hyperparameters, column lists
+│   ├── utils.py                  # Logger, Sharpe/IRR/bootstrap helpers
+│   ├── preprocess_pipeline.py    # Data preprocessing
+│   └── train_models.py           # Train → validate (θ*) → test → benchmark
+├── notebooks/
+│   ├── 01_label_definition.ipynb
+│   ├── 02_eda_visualization.ipynb
+│   ├── 03_modeling.ipynb
+│   └── 03_modeling_result.ipynb
+├── models/
+│   ├── ANN_Validation.pkl
+│   ├── ANN_Test.pkl
+│   └── optimal_threshold.png
+├── 260129_feature 변수후보.xlsx   # Feature candidate list
+└── requirements.txt
+```
 
-**하이퍼파라미터**:
+---
+
+## Core Algorithm
+
+**Sharpe ratio** (IRR-based)
+
+$$\text{Sharpe} = \frac{E[R_p] - E[R_f]}{\sigma[R_p]}$$
+
+**Investment decision logic**
+
 ```python
-{
-    'hidden_layers': [256, 128, 64],
-    'activation': 'relu',
-    'output_activation': 'sigmoid',
-    'batch_size': 32,
-    'epochs': 100,
-    'learning_rate': 0.001,
-    'dropout_rate': 0.3,
-    'validation_split': 0.2,
-    'random_state': 42
-}
+invest = pred_prob < θ           # only invest below the default-probability threshold
+
+portfolio_return = (
+    IRR        if invest          # actual internal rate of return
+    else rf_return                # risk-free (treasury) return otherwise
+)
+
+Sharpe = (mean(portfolio_return) - mean(rf_return)) / std(portfolio_return)
 ```
+
+**IRR**, computed from an amortizing-loan cash flow (equal monthly payments, early termination on default), then annualized: `(1 + monthly_irr)^12 - 1`.
+
+**θ\* search** — on the validation set, evaluate Sharpe at 990 threshold values (1%–99%, 0.1% steps) and keep the one that maximizes it. On the test set, apply θ\* and bootstrap 1,000 times to get a 95% confidence interval (2.5th–97.5th percentile of the Sharpe distribution).
 
 ---
 
-## 🎯 부도(Default) 정의
+## Model Configuration
 
-**부도 상태** (Target = 1):
+Values as defined in `src/config.py`.
+
+| Parameter | Value |
+|---|---|
+| `hidden_layer_sizes` | `(256, 128, 64)` |
+| `activation` | `relu` |
+| `learning_rate_init` | `0.001` |
+| `alpha` (L2 regularization) | `0.001` |
+| `batch_size` | `512` |
+| `max_iter` | `1000` |
+| `early_stopping` | `True` |
+| `random_state` | `42` |
+
+**Default definition**
+
 ```python
-[
-    'Charged Off',
-    'Default',
-    'Late (31-120 days)',
-    'Does not meet the credit policy. Status:Charged Off'
-]
+# Target = 1 (default)
+["Charged Off", "Default", "Late (31-120 days)"]
+
+# Target = 0 (performing)
+["Fully Paid"]
 ```
 
-**정상 상태** (Target = 0):
-```python
-[
-    'Fully Paid',
-    'Does not meet the credit policy. Status:Fully Paid'
-]
-```
+**Key settings**
+
+| Setting | Value | Description |
+|---|---|---|
+| `INVESTMENT_THRESHOLD` | `0.15` | Fallback reject threshold before θ\* search |
+| `USE_SAMPLE` / `SAMPLE_FRAC` | `False` / `0.3` | Test-mode subsampling |
+| `DEFAULT_RF_3YR` / `DEFAULT_RF_5YR` | `0.061` / `0.104` | Fallback treasury yields if the FRED fetch fails |
 
 ---
 
-## 📈 평가 지표
+## Evaluation
 
-### 1. ROC-AUC
-분류 성능 평가 - 부도 예측 정확도
-
-### 2. Sharpe Ratio
-투자 성과 평가 - 단위 위험당 초과 수익률
-$$\text{Sharpe} = \frac{\text{평균 수익률} - \text{무위험률}}{\text{표준편차}}$$
-
-### 3. 평균 수익률
-포트폴리오의 기대 수익
-
-### 4. 투자 승인 비율
-전체 대출 중 투자 비율 (θ* < 부도확률)
+- **ROC-AUC** — classification performance for default prediction
+- **Sharpe ratio** — risk-adjusted portfolio return at θ\*
+- **Approval rate** — share of loans invested in (`pred_prob < θ*`)
+- **Benchmark comparison** — Sharpe of the ANN + θ\* strategy vs. an approve-all-loans strategy
+- Every run is logged to `experiments_log.csv` (`Date, Model, Split, AUC, Sharpe, Avg_Return, Duration, Params, Memo`)
 
 ---
 
-## 🔑 주요 설정값 (config.py)
+## Tech Stack
 
-| 설정 | 값 | 설명 |
-|-----|-----|------|
-| `MODELS_TO_USE` | `['ANN']` | 사용 모델 (ANN만 사용) |
-| `INVESTMENT_THRESHOLD` | 0.15 | 부도 확률 15% 이상이면 투자 거절 |
-| `SAMPLE_FRAC` | 0.3 | 테스트 모드에서 사용할 데이터 비율 |
-| `USE_SAMPLE` | False | 현재는 전체 데이터 사용 |
-| `DEFAULT_RF_3YR` | 0.061 | 3년 만기 국채 기본 수익률 |
-| `DEFAULT_RF_5YR` | 0.104 | 5년 만기 국채 기본 수익률 |
-
----
-
-## 📊 최종 평가 (Test Set)
-
-### 1️⃣ 포트폴리오 성과
-```
-- 평균 수익률: E[portfolio_return]
-- Sharpe Ratio: (mean - rf_mean) / std
-- 투자 승인 비율: 전체 대출 중 투자 비율
-```
-
-### 2️⃣ 벤치마크 비교 (모든 대출 승인 시나리오)
-```
-벤치마크 Sharpe = (E[모든 대출 IRR] - E[국채]) / σ[모든 대출 IRR]
-
-성과 개선도 = (ANN Sharpe - 벤치마크) / 벤치마크 × 100%
-```
-
-### 3️⃣ 신뢰구간
-```
-95% 신뢰구간: [CI_lower, CI_upper]
-→ Test Sharpe 분포의 하위 2.5%, 상위 97.5% 백분위수
-```
+| Layer | Technology |
+|---|---|
+| ML | scikit-learn (`MLPClassifier`) |
+| Data | pandas · Polars · NumPy |
+| Financial calc | numpy-financial (IRR) · pandas-datareader (FRED treasury rates) |
+| Viz | matplotlib · seaborn |
+| Notebooks | Jupyter / JupyterLab |
 
 ---
 
-## ✨ 리팩토링 완료사항
+<details>
+<summary>🇰🇷 &nbsp;한국어 설명 보기</summary>
+<br/>
 
-### 1️⃣ Python 환경 설정
-- **가상환경 생성**: 독립적인 Python 3.9 환경 구성
-- **패키지 설치**: 필수 패키지만 선별하여 최소화
+## 개요
 
-### 2️⃣ 중앙화된 설정 관리 (config.py)
-모든 경로와 상수를 한 곳에서 관리:
-- 경로 설정 (데이터, 모델, 로그)
-- 4개 모델의 하이퍼파라미터
-- 부도 정의 & 제외 변수 리스트
-- 투자 임계값, 국채 수익률
+**LendingClub Sharpe Optimizer**는 Lending Club 대출 데이터로 **scikit-learn `MLPClassifier`(ANN)**를 학습해 부도 확률을 예측하고, IRR 기반 현금흐름으로 계산한 포트폴리오 **Sharpe Ratio**를 최대화하는 투자 임계값 **θ\***를 탐색합니다. 1,000회 부트스트래핑으로 95% 신뢰구간을 산출하며, 모든 대출을 승인하는 벤치마크와 성과를 비교합니다.
 
-### 3️⃣ 모델 코드 리팩토링
+## 빠른 시작
 
-#### **train_models.py** (Random Split)
-```
-🔥 구현된 모델: ANN (신경망)
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 
-📊 평가 방식:
-├── 60/20/20 랜덤 분할
-├── ROC-AUC 계산
-├── Sharpe Ratio 산출 (투자 관점)
-├── 최적 임계값 θ* 부트스트래핑 탐색
-└── Test 세트로 최종 성과 평가
+cd src
+python preprocess_pipeline.py
+python train_models.py
 ```
 
-#### **train_models_random.py** (K-Fold Cross-Validation)
-```
-🔢 K-Fold 설정:
-├── 5-Fold Cross-Validation
-├── shuffle=True, random_state=42
-└── 각 Fold별 독립적인 모델 학습
+## 핵심 알고리즘
 
-📊 결과 저장:
-├── 매 Fold마다 experiments_log.csv에 기록
-├── 앙상블 평가도 Fold별로 진행
-└── 모델별 가중치를 동적으로 계산
-```
+- **Train(60%)**: ANN 학습
+- **Validation(20%)**: 990개 θ값(1%~99%, 0.1% 단위) 중 Sharpe 최대인 θ\* 선택
+- **Test(20%)**: θ\* 적용 후 1,000회 부트스트래핑으로 95% 신뢰구간 산출, 벤치마크와 비교
 
----
+부도 확률이 θ 미만인 대출만 투자하며, 투자 시 IRR, 거절 시 무위험수익률을 포트폴리오 수익률로 사용해 Sharpe Ratio를 계산합니다.
 
-## 📝 실험 로깅
+## 모델 설정 (`src/config.py`)
 
-모든 실험 결과는 `experiments_log.csv`에 기록:
-```
-Date, Model, Split, AUC, Sharpe, Avg_Return, Duration, Params, Memo
-```
+은닉층 `(256, 128, 64)` · 활성화함수 `relu` · L2 정규화(`alpha`) `0.001` · `batch_size` `512` · `max_iter` `1000` · `early_stopping` `True`
 
----
-
-## 🚀 다음 단계
-
-1. **하이퍼파라미터 튜닝**: `config.py`의 `MODEL_PARAMS` 조정
-2. **최적 임계값**: 부트스트래핑으로 자동 탐색
-3. **변수 선택**: `EXCLUDE_COLS` 조정하여 특성 공학 진행
-4. **Out-of-Sample 테스트**: Test 세트로 최종 성과 평가
-
+</details>
